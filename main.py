@@ -25,6 +25,20 @@ class PredictRequest(BaseModel):
 def read_root():
     return {"message": "Welcome to the ARIMA Model API!"}
 
+@app.post("/upload-csv/")
+async def upload_csv(file: UploadFile = File(...)):
+    """
+    Upload a CSV file and process its data.
+    """
+    try:
+        # Read the CSV file into a pandas DataFrame
+        df = pd.read_csv(file.file)
+        # Process the DataFrame as needed
+        # For example, you can convert it to a list of dictionaries
+        data = df.to_dict(orient="records")
+        return {"data": data}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
 
 @app.post("/train")
 def train_model(request: TrainRequest):
