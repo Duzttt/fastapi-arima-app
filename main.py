@@ -1,7 +1,8 @@
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, HTTPException, UploadFile, File
 from pydantic import BaseModel
 import numpy as np
 from model import ARIMAModel
+import pandas as pd
 
 app = FastAPI()
 
