@@ -9,20 +9,26 @@ from model import ARIMAModel
 import matplotlib.pyplot as plt
 import io
 import base64
+import logging
 
 # Initialize FastAPI app
 app = FastAPI()
 
+# Set up logging
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
+
 # Mount the static files directory to serve the HTML file
 app.mount("/static", StaticFiles(directory="static"), name="static")
 
-# Initialize ARIMA model
-model = ARIMAModel(model_path="arima_model.pkl")
-
+# Initialize ARIMA model with correct path
+model_path = "/app/static/arima_model.pkl"
 try:
+    model = ARIMAModel(model_path=model_path)
     model.load_model()  # Load pre-trained ARIMA model
+    logger.info("Model loaded successfully.")
 except Exception as e:
-    print(f"Error loading model: {e}")
+    logger.error(f"Error loading model: {e}")
 
 # Define input schema for prediction
 class PredictRequest(BaseModel):
@@ -42,7 +48,6 @@ class PredictRequest(BaseModel):
             raise ValueError("Year must be equal to or greater than the current year.")
         return v
 
-
 @app.get("/")
 def read_root():
     """
@@ -56,6 +61,8 @@ def predict(request: PredictRequest):
     Predict future values for a given month and year.
     """
     try:
+        logger.info(f"Received prediction request: {request}")
+        
         # Current date
         current_date = dt.datetime.now()
 
@@ -73,6 +80,7 @@ def predict(request: PredictRequest):
 
         # Predict future values
         predictions = model.predict(steps=steps)
+        logger.info(f"Predictions: {predictions}")
 
         # Plot the predictions
         plt.figure(figsize=(10, 6))
@@ -99,6 +107,7 @@ def predict(request: PredictRequest):
         }
 
     except Exception as e:
+        logger.error(f"Prediction failed: {e}")
         raise HTTPException(status_code=500, detail=f"Prediction failed: {e}")
 
 if __name__ == "__main__":
