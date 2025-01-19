@@ -1,4 +1,6 @@
 from fastapi import FastAPI, HTTPException
+from fastapi.staticfiles import StaticFiles
+from fastapi.responses import FileResponse, HTMLResponse
 from pydantic import BaseModel, validator
 import numpy as np
 import pandas as pd
@@ -10,6 +12,9 @@ import base64
 
 # Initialize FastAPI app
 app = FastAPI()
+
+# Mount the static files directory to serve the HTML file
+app.mount("/static", StaticFiles(directory="static"), name="static")
 
 # Initialize ARIMA model
 model = ARIMAModel(model_path="arima_model.pkl")
@@ -41,10 +46,9 @@ class PredictRequest(BaseModel):
 @app.get("/")
 def read_root():
     """
-    Root endpoint for health check.
+    Root endpoint to serve the HTML file.
     """
-    return {"message": "Welcome to the ARIMA Prediction API!"}
-
+    return FileResponse("static/index.html")
 
 @app.post("/predict/")
 def predict(request: PredictRequest):
@@ -87,14 +91,16 @@ def predict(request: PredictRequest):
         plot_base64 = base64.b64encode(buf.read()).decode("utf-8")
         buf.close()
 
-        # No need for .tolist() since predictions is already a list
         return {
             "target_date": f"{request.month}/{request.year}",
             "steps_into_future": steps,
-            "predictions": predictions,  # predictions is already a list
+            "predictions": predictions,
             "plot": plot_base64,
         }
 
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Prediction failed: {e}")
 
+if __name__ == "__main__":
+    import uvicorn
+    uvicorn.run(app, host="0.0.0.0", port=8000)

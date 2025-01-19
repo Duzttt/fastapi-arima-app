@@ -1,0 +1,134 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ARIMA Egg Price Prediction</title>
+    <style>
+        body {
+            font-family: sans-serif;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            min-height: 100vh;
+            margin: 0;
+            background-color: #f4f4f4; /* Light background */
+            color: #333; /* Darker text */
+        }
+
+        .container {
+            background-color: white;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 2px 5px rgba(0, 0, 0, 0.1);
+            width: 90%; /* Responsive width */
+            max-width: 600px; /* Maximum width */
+        }
+
+        h1 {
+            color: #007bff; /* Blue heading */
+            margin-bottom: 20px;
+        }
+
+        .input-group {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 15px;
+            flex-wrap: wrap; /* Allow wrapping on smaller screens */
+            justify-content: center;
+        }
+
+        label {
+            font-weight: bold;
+            display: block; /* Makes labels stack nicely */
+            margin-bottom: 5px;
+        }
+
+        input[type="number"] {
+            padding: 8px;
+            border: 1px solid #ccc;
+            border-radius: 4px;
+            width: 80px; /* Consistent input width */
+        }
+
+        button {
+            padding: 10px 15px;
+            background-color: #007bff;
+            color: white;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            transition: background-color 0.3s;
+        }
+
+        button:hover {
+            background-color: #0056b3;
+        }
+
+        #plot-container {
+            margin-top: 20px;
+            width: 100%; /* Make the image responsive */
+        }
+
+        #plot-img {
+            max-width: 100%;
+            height: auto;
+            display: block; /* Prevents image from affecting layout */
+            margin: 0 auto; /* Center the image */
+        }
+
+        .error-message {
+            color: red;
+            margin-top: 10px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>ARIMA Egg Price Prediction</h1>
+        <div class="input-group">
+            <label for="month">Month:</label>
+            <input type="number" id="month" name="month" min="1" max="12" value="1">
+            <label for="year">Year:</label>
+            <input type="number" id="year" name="year" min="2025" max="2100" value="2025">
+        </div>
+        <button onclick="fetchPlot()">Get Prediction</button>
+        <div id="plot-container">
+            <img id="plot-img" alt="Plot Image">
+        </div>
+        <div id="error-message" class="error-message"></div>
+    </div>
+
+    <script>
+        async function fetchPlot() {
+            const month = document.getElementById('month').value;
+            const year = document.getElementById('year').value;
+            const errorMessage = document.getElementById('error-message');
+            errorMessage.textContent = ""; // Clear previous errors
+
+            try {
+                const response = await fetch('/predict/', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({ month: parseInt(month), year: parseInt(year) }),
+                });
+
+                if (response.ok) {
+                    const data = await response.json();
+                    const plotImg = document.getElementById('plot-img');
+                    plotImg.src = 'data:image/png;base64,' + data.plot;
+                } else {
+                    const errorData = await response.json(); // Try to get error details from the server
+                    errorMessage.textContent = errorData.message || 'Failed to fetch prediction. Please check your inputs.';
+                }
+            } catch (error) {
+                errorMessage.textContent = 'An unexpected error occurred.';
+                console.error("Fetch error:", error);
+            }
+        }
+    </script>
+</body>
+</html>
