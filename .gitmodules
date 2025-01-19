@@ -1,0 +1,3 @@
+[submodule "src/realesrgan"]
+    path = src/realesrgan
+    url = https://github.com/Duzttt/fastapi-arima-app.git
