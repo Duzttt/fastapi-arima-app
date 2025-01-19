@@ -4,3 +4,4 @@ numpy
 statsmodels
 pydantic
 matplotlib
+python-multipart

@@ -1,84 +1,100 @@
-from fastapi import FastAPI, HTTPException, UploadFile, File
-from pydantic import BaseModel
+from fastapi import FastAPI, HTTPException
+from pydantic import BaseModel, validator
 import numpy as np
-from model import ARIMAModel
 import pandas as pd
+import datetime as dt
+from model import ARIMAModel
 import matplotlib.pyplot as plt
 import io
 import base64
 
+# Initialize FastAPI app
 app = FastAPI()
 
-# Initialize the ARIMA model class
+# Initialize ARIMA model
 model = ARIMAModel(model_path="arima_model.pkl")
 
 try:
-    model.load_model()  # Load the pre-trained model
+    model.load_model()  # Load pre-trained ARIMA model
 except Exception as e:
     print(f"Error loading model: {e}")
 
-# Define input schemas
-class TrainRequest(BaseModel):
-    data: list
-    order: tuple
-
+# Define input schema for prediction
 class PredictRequest(BaseModel):
-    steps: int
+    month: int
+    year: int
+
+    @validator("month")
+    def validate_month(cls, v):
+        if v < 1 or v > 12:
+            raise ValueError("Month must be between 1 and 12.")
+        return v
+
+    @validator("year")
+    def validate_year(cls, v):
+        current_year = dt.datetime.now().year
+        if v < current_year:
+            raise ValueError("Year must be equal to or greater than the current year.")
+        return v
+
 
 @app.get("/")
 def read_root():
-    return {"message": "Welcome to the ARIMA Model API!"}
+    """
+    Root endpoint for health check.
+    """
+    return {"message": "Welcome to the ARIMA Prediction API!"}
 
-@app.post("/upload-csv/")
-async def upload_csv(file: UploadFile = File(...)):
-    """
-    Upload a CSV file and process its data.
-    """
-    try:
-        # Read the CSV file into a pandas DataFrame
-        df = pd.read_csv(file.file, parse_dates=["Date"], index_col="Date")
-        # Extract the values for the ARIMA model
-        data = df["Gred A"].values.tolist()
-        return {"data": data}
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
 
-@app.post("/train")
-def train_model(request: TrainRequest):
-    """
-    Train the ARIMA model with provided data and order.
-    """
-    try:
-        trained_model = model.train(data=np.array(request.data), order=request.order)
-        model.save_model("arima_model.pkl")  # Save the trained model
-        return {"message": "Model trained successfully", "summary": trained_model.summary().as_text()}
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Training failed: {e}")
-
-@app.post("/predict")
+@app.post("/predict/")
 def predict(request: PredictRequest):
     """
-    Predict future values using the trained ARIMA model.
+    Predict future values for a given month and year.
     """
     try:
-        predictions = model.predict(steps=request.steps)
-        
+        # Current date
+        current_date = dt.datetime.now()
+
+        # Target date from user input
+        target_date = dt.datetime(year=request.year, month=request.month, day=1)
+
+        # Calculate the number of steps (months) into the future
+        if target_date <= current_date:
+            raise HTTPException(
+                status_code=400, detail="Target date must be in the future."
+            )
+
+        # Calculate months difference
+        steps = (target_date.year - current_date.year) * 12 + (target_date.month - current_date.month)
+
+        # Predict future values
+        predictions = model.predict(steps=steps)
+
         # Plot the predictions
         plt.figure(figsize=(10, 6))
-        plt.plot(predictions, label="Predictions")
+        plt.plot(range(1, steps + 1), predictions, label="Predicted Values")
+        plt.title(f"ARIMA Predictions for {request.month}/{request.year}")
+        plt.xlabel("Steps (Months)")
+        plt.ylabel("Predicted Values")
         plt.legend()
-        plt.title("ARIMA Model Predictions")
-        plt.xlabel("Time")
-        plt.ylabel("Values")
-        
+
         # Save the plot to a BytesIO object
         buf = io.BytesIO()
-        plt.savefig(buf, format='png')
+        plt.savefig(buf, format="png")
         buf.seek(0)
-        
-        # Encode the plot to base64 string
-        plot_base64 = base64.b64encode(buf.read()).decode('utf-8')
-        
-        return {"predictions": predictions, "plot": plot_base64}
+
+        # Encode the plot to base64
+        plot_base64 = base64.b64encode(buf.read()).decode("utf-8")
+        buf.close()
+
+        # No need for .tolist() since predictions is already a list
+        return {
+            "target_date": f"{request.month}/{request.year}",
+            "steps_into_future": steps,
+            "predictions": predictions,  # predictions is already a list
+            "plot": plot_base64,
+        }
+
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Prediction failed: {e}")
+
