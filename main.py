@@ -3,6 +3,9 @@ from pydantic import BaseModel
 import numpy as np
 from model import ARIMAModel
 import pandas as pd
+import matplotlib.pyplot as plt
+import io
+import base64
 
 app = FastAPI()
 
@@ -33,10 +36,9 @@ async def upload_csv(file: UploadFile = File(...)):
     """
     try:
         # Read the CSV file into a pandas DataFrame
-        df = pd.read_csv(file.file)
-        # Process the DataFrame as needed
-        # For example, you can convert it to a list of dictionaries
-        data = df.to_dict(orient="records")
+        df = pd.read_csv(file.file, parse_dates=["Date"], index_col="Date")
+        # Extract the values for the ARIMA model
+        data = df["Gred A"].values.tolist()
         return {"data": data}
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
@@ -60,6 +62,23 @@ def predict(request: PredictRequest):
     """
     try:
         predictions = model.predict(steps=request.steps)
-        return {"predictions": predictions}
+        
+        # Plot the predictions
+        plt.figure(figsize=(10, 6))
+        plt.plot(predictions, label="Predictions")
+        plt.legend()
+        plt.title("ARIMA Model Predictions")
+        plt.xlabel("Time")
+        plt.ylabel("Values")
+        
+        # Save the plot to a BytesIO object
+        buf = io.BytesIO()
+        plt.savefig(buf, format='png')
+        buf.seek(0)
+        
+        # Encode the plot to base64 string
+        plot_base64 = base64.b64encode(buf.read()).decode('utf-8')
+        
+        return {"predictions": predictions, "plot": plot_base64}
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Prediction failed: {e}")
