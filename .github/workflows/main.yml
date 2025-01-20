@@ -1,0 +1,68 @@
+name: CI/CD Pipeline
+
+on:
+  push:
+    branches:
+      - main  # Trigger the workflow on push to the main branch
+  pull_request:
+    branches:
+      - main  # Run tests on pull requests to main
+
+jobs:
+  # Step 1: Run Tests
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v3
+
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: 3.9
+
+      - name: Install Dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+
+      - name: Run Tests
+        run: |
+          pytest --disable-warnings
+
+  # Step 2: Build and Push Docker Image
+  build_and_push:
+    needs: test  # Run only after tests pass
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v3
+
+      - name: Log in to DockerHub
+        uses: docker/login-action@v2
+        with:
+          username: ${{ secrets.DOCKER_USERNAME }}
+          password: ${{ secrets.DOCKER_PASSWORD }}
+
+      - name: Build and Push Docker Image
+        run: |
+          docker build -t ${{ secrets.DOCKER_USERNAME }}/fastapi-arima-app:latest .
+          docker push ${{ secrets.DOCKER_USERNAME }}/fastapi-arima-app:latest
+
+  # Step 3: Deploy Application
+  deploy:
+    needs: build_and_push  # Run only after the Docker image is pushed
+    runs-on: ubuntu-latest
+    steps:
+      - name: Deploy Application via SSH
+        uses: appleboy/ssh-action@v0.1.10
+        with:
+          host: ${{ secrets.SERVER_HOST }}
+          username: ${{ secrets.SERVER_USER }}
+          key: ${{ secrets.SERVER_SSH_KEY }}
+          port: 22
+          script: |
+            docker pull ${{ secrets.DOCKER_USERNAME }}/fastapi-arima-app:latest
+            docker stop fastapi-arima || true
+            docker rm fastapi-arima || true
+            docker run -d --name fastapi-arima -p 8081:80 ${{ secrets.DOCKER_USERNAME }}/fastapi-arima-app:latest
