@@ -6,3 +6,4 @@ pydantic
 matplotlib
 python-multipart
 pytest
+httpx
