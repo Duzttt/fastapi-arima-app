@@ -28,14 +28,7 @@ jobs:
 
       - name: Run tests
         run: |
-          pytest
+          pytest --maxfail=10 --disable-warnings
 
-      - name: Build project
-        run: |
-          echo 'Building project...'
-          # Add your build steps here
-
-      - name: Deploy
-        run: |
-          echo 'Deploying...'
-          # Add your deployment steps here
+      - name: Show pytest logs
+        run: cat /home/runner/work/_temp/*-debug.log
